@@ -1,11 +1,13 @@
 set(SRCS
             emu_window/emu_window_sdl2.cpp
+            rebind_window/rebind_window_sdl2.cpp
             citra.cpp
             config.cpp
             citra.rc
             )
 set(HEADERS
             emu_window/emu_window_sdl2.h
+            rebind_window/rebind_window_sdl2.h
             config.h
             default_ini.h
             resource.h
@@ -17,7 +19,7 @@ include_directories(${SDL2_INCLUDE_DIR})
 
 add_executable(citra ${SRCS} ${HEADERS})
 target_link_libraries(citra core video_core audio_core common)
-target_link_libraries(citra ${SDL2_LIBRARY} ${OPENGL_gl_LIBRARY} inih glad)
+target_link_libraries(citra ${SDL2_LIBRARY} ${OPENGL_gl_LIBRARY} inih glad SDL_Pango)
 if (MSVC)
     target_link_libraries(citra getopt)
 endif()

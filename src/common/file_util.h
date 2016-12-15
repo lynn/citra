@@ -170,6 +170,11 @@ size_t ReadFileToString(bool text_file, const char* filename, std::string& str);
 void SplitFilename83(const std::string& filename, std::array<char, 9>& short_name,
                      std::array<char, 4>& extension);
 
+// Set a single key in an INI file at the given path, creating a new key/section
+// if necessary. Overwrites the original file. Returns true on success.
+bool SetINIKey(const std::string& filename, const std::string& section, const std::string& key,
+               const std::string& value);
+
 // simple wrapper for cstdlib file functions to
 // hopefully will make error checking easier
 // and make forgetting an fclose() harder

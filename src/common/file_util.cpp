@@ -7,6 +7,7 @@
 #include "common/common_paths.h"
 #include "common/file_util.h"
 #include "common/logging/log.h"
+#include "common/string_util.h"
 
 #ifdef _WIN32
 #include <windows.h>
@@ -46,6 +47,7 @@
 #endif
 
 #include <algorithm>
+#include <sstream>
 #include <sys/stat.h>
 
 #ifndef S_ISDIR
@@ -834,6 +836,83 @@ void SplitFilename83(const std::string& filename, std::array<char, 9>& short_nam
         for (char letter : filename.substr(point + 1, 3))
             extension[j++] = toupper(letter);
     }
+}
+
+bool SetINIKey(const std::string& filename, const std::string& section, const std::string& key,
+               const std::string& value) {
+    // TODO: Rewrite this to take a map<section, map<key, value>>, performing
+    // many updates at once.
+
+    std::string contents;
+    ReadFileToString(true, filename.c_str(), contents);
+    std::istringstream iss(contents);
+
+    std::string new_contents;
+    std::string this_section;
+    std::string target_section = Common::ToLower(section);
+    std::string target_key = Common::ToLower(key);
+
+    bool updated = false;
+    for (std::string line; std::getline(iss, line);) {
+        std::string original = line + "\n";
+
+        // Strip any inline comment.
+        size_t comment = line.find(" ;");
+        if (comment != std::string::npos) {
+            line.erase(line.begin() + comment, line.end());
+        }
+
+        // Strip whitespace, too.
+        line = Common::StripSpaces(line);
+        if (line.empty() || line[0] == '#' || line[0] == ';') {
+            new_contents += original;
+            continue;
+        }
+
+        if (line[0] == '[') {
+            if (line.back() == ']') {
+                // Valid section header.
+
+                if (this_section == target_section && !updated) {
+                    // Create a new key.
+                    new_contents += key + "=" + value + "\n\n";
+                    updated = true;
+                }
+
+                this_section = Common::ToLower(line.substr(1, line.size() - 2));
+                new_contents += original;
+                continue;
+            } else {
+                // Invalid section header.
+                return false;
+            }
+        }
+
+        // Handle key-value pairs.
+        // We want to keep indentation, here, so work with `original`.
+        size_t equals = original.find("=");
+        if (equals != std::string::npos) {
+            std::string pre = original.substr(0, equals);
+            std::string this_key = Common::ToLower(Common::StripSpaces(pre));
+            if (this_section == target_section && this_key == target_key) {
+                new_contents += pre + "=" + value + "\n";
+                updated = true;
+            } else {
+                new_contents += original;
+            }
+        } else {
+            // Invalid key-value pair.
+            return false;
+        }
+    }
+
+    if (!updated) {
+        // Create a new section.
+        new_contents += "\n[" + section + "]\n" + key + "=" + value + "\n";
+    }
+
+    WriteStringToFile(true, new_contents, filename.c_str());
+    return true;
 }
 
 IOFile::IOFile() {}

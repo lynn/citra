@@ -18,5 +18,7 @@ class Config {
 public:
     Config();
 
+    const std::string& GetConfigPath();
+
     void Reload();
 };

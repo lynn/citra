@@ -21,8 +21,11 @@
 #include <windows.h>
 #endif
 
+#include <SDL.h>
+
 #include "citra/config.h"
 #include "citra/emu_window/emu_window_sdl2.h"
+#include "citra/rebind_window/rebind_window_sdl2.h"
 #include "common/logging/backend.h"
 #include "common/logging/filter.h"
 #include "common/logging/log.h"
@@ -40,12 +43,28 @@ static void PrintHelp(const char* argv0) {
     std::cout << "Usage: " << argv0
               << " [options] <filename>\n"
                  "-g, --gdbport=NUMBER  Enable gdb stub on port NUMBER\n"
+                 "-l, --list-bindings   List the current keybindings\n"
+                 "-r, --rebind=KEY      Rebind a key (see -l for key names)\n"
                  "-h, --help            Display this help and exit\n"
                  "-v, --version         Output version information and exit\n";
 }
 
 static void PrintVersion() {
     std::cout << "Citra " << Common::g_scm_branch << " " << Common::g_scm_desc << std::endl;
+}
+
+static void ListBindings(const Config& config) {
+    for (int i = 0; i < Settings::NativeInput::NUM_INPUTS; ++i) {
+        int code = Settings::values.input_mappings[Settings::NativeInput::All[i]];
+        std::cout << Settings::NativeInput::Mapping[i] << ": "
+                  << SDL_GetScancodeName(static_cast<SDL_Scancode>(code)) << std::endl;
+    }
+}
+
+/// Show an SDL window to rebind the `index`-th key in Settings::NativeInput::All.
+static void Rebind(int index, const std::string& config_filename) {
+    RebindWindow_SDL2 rebind_window(index, config_filename);
+    rebind_window.Run();
 }
 
 /// Application entry point
@@ -67,14 +86,13 @@ int main(int argc, char** argv) {
     std::string boot_filename;
 
     static struct option long_options[] = {
-        {"gdbport", required_argument, 0, 'g'},
-        {"help", no_argument, 0, 'h'},
-        {"version", no_argument, 0, 'v'},
-        {0, 0, 0, 0},
+        {"gdbport", required_argument, 0, 'g'}, {"list-bindings", no_argument, 0, 'l'},
+        {"rebind", required_argument, 0, 'r'},  {"help", no_argument, 0, 'h'},
+        {"version", no_argument, 0, 'v'},       {0, 0, 0, 0},
     };
 
     while (optind < argc) {
-        char arg = getopt_long(argc, argv, "g:hv", long_options, &option_index);
+        char arg = getopt_long(argc, argv, "g:lr:hv", long_options, &option_index);
         if (arg != -1) {
             switch (arg) {
             case 'g':
@@ -88,6 +106,22 @@ int main(int argc, char** argv) {
                     exit(1);
                 }
                 break;
+            case 'l':
+                ListBindings(config);
+                return 0;
+            case 'r':
+                // Try to read a key name.
+                for (int i = 0; i < Settings::NativeInput::NUM_INPUTS; ++i) {
+                    if (strcmp(Settings::NativeInput::Mapping[i], optarg) == 0) {
+                        Rebind(i, config.GetConfigPath());
+                        return 0;
+                    }
+                }
+
+                LOG_CRITICAL(Frontend, "\"%s\" is not a valid key name. "
+                                       "See `%s -l` for a list of key names.",
+                             optarg, argv[0]);
+                return -1;
             case 'h':
                 PrintHelp(argv[0]);
                 return 0;
